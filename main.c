@@ -13,7 +13,7 @@
 
 #define COMMAND_BUFFER_MAX_LENGTH 256
 #define MESSAGE_BUFFER_MAX_LENGTH 2048
-#define FILE_BUFFER_MAX_LENGTH 5242880
+#define FILE_BUFFER_MAX_LENGTH 32768
 
 #define FILE_LISTING_COMMAND "ls -A"
 
@@ -64,6 +64,8 @@ void cli_ls();
  */
 void cli_rls(int serverSocketDescriptor);
 
+void cli_put(int serverSocketDescriptor, char filename[COMMAND_BUFFER_MAX_LENGTH]);
+
 /**
  * Execute invalid command behavior.
  */
@@ -113,6 +115,18 @@ int main() {
             cli_ls();
         } else if(strcmp(commandBuffer, "rls") == 0) {
             cli_rls(socketDescriptor);
+        } else if(strncmp(commandBuffer, "put ", 4) == 0) {
+            char filename[COMMAND_BUFFER_MAX_LENGTH];
+            int i = 4;
+
+            while(commandBuffer[i] != ' ' && commandBuffer[i] != '\n') {
+                filename[i - 4] = commandBuffer[i];
+                i++;
+            }
+
+            filename[i] = '\0';
+
+            cli_put(socketDescriptor, filename);
         } else {
             cli_invalidCommand();
         }
@@ -183,6 +197,46 @@ void cli_rls(int serverSocketDescriptor) {
     printf("%s\n", LINE_SEPARATOR);
     printf("%s\n", messageBuffer);
     printf("%s\n", LINE_SEPARATOR);
+}
+
+void cli_put(int serverSocketDescriptor, char filename[COMMAND_BUFFER_MAX_LENGTH]) {
+    FILE* pfile = fopen(filename, "r");
+
+    if(pfile == NULL) {
+        perror("File Opening Error");
+    } else {
+        int resSend;
+
+        char remoteCommand[COMMAND_BUFFER_MAX_LENGTH];
+        strcpy(remoteCommand, "put ");
+        strcat(remoteCommand, filename);
+
+        if((resSend = send(serverSocketDescriptor, &remoteCommand, (4*sizeof(char)), 0)) == -1) {
+            perror("Command Sending Error");
+            return;
+        }
+        if(resSend == 0) {
+            perror("Server Down");
+            return;
+        }
+
+        /*char bufferPart[FILE_BUFFER_MAX_LENGTH];
+
+        char command[COMMAND_BUFFER_MAX_LENGTH];
+        strcpy(command, "put ");
+        strcat(command, filename);
+
+        printf("%s", command);
+
+        int resSend;
+
+        if((resSend = send(serverSocketDescriptor, &command, COMMAND_BUFFER_MAX_LENGTH, 0)) == -1) {
+            perror("Command Sending Error");
+            return;
+        }
+
+        fclose(pfile);*/
+    }
 }
 
 void cli_invalidCommand() {
